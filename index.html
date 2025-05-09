@@ -1,13 +1,98 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>いぬねこタイプ診断</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 2em; background: #fffaf3; }
+    .question { font-size: 1.2em; margin: 1em 0; }
+    .button { background: #f4a261; color: white; border: none; padding: 1em 2em; margin: 0.5em; font-size: 1em; border-radius: 10px; cursor: pointer; }
+    .button:hover { background: #e57d23; }
+    #question-area, #loading-area { display: none; }
+  </style>
 </head>
 <body>
-  <!-- iframe埋め込み用の診断ロジックがここに入ります -->
-  <p>このファイルは診断ロジックを含む index.html のテンプレートです。</p>
+  <div id="start-area">
+    <h1>いぬねこ性格・タイプ診断</h1>
+    <p>どちらの診断を受けますか？</p>
+    <button class="button" onclick="startDiagnosis('dog')">🐶 犬タイプ診断</button>
+    <button class="button" onclick="startDiagnosis('cat')">🐱 猫タイプ診断</button>
+  </div>
+
+  <div id="question-area">
+    <p id="question-text" class="question"></p>
+    <button class="button" onclick="answer('はい')">はい</button>
+    <button class="button" onclick="answer('いいえ')">いいえ</button>
+  </div>
+
+  <div id="loading-area">
+    <p>診断中です... 少々お待ちください。</p>
+  </div>
+
+  <script>
+    const dogQuestions = ["朝型ですか？", "計画的に動くのは得意？", "誰かをリードしたい？", "新しい場所は好き？", "人と話すのは得意？", "1つのことに集中できる？", "責任感が強い？", "協調性がある？", "細かいことが気になる？", "ポジティブですか？"];
+    const catQuestions = ["一人が落ち着く？", "観察力に自信がある？", "気分屋な方？", "表情に出にくい？", "インドアが好き？", "環境変化に敏感？", "自分のペースを守る？", "人見知りする？", "気配りが得意？", "熱中しやすい？"];
+    const slugMap = {
+      "柴犬タイプ": "shiba",
+      "ゴールデンタイプ": "golden",
+      "ラブラドールタイプ": "labrador",
+      "トイプードルタイプ": "toypoodle",
+      "ダックスフンドタイプ": "dachshund",
+      "三毛猫タイプ": "mike",
+      "ロシアンブルータイプ": "russianblue",
+      "ラグドールタイプ": "ragdoll",
+      "ベンガルタイプ": "bengal",
+      "黒猫タイプ": "kuroneko"
+    };
+
+    let selectedType = "dog";
+    let current = 0;
+    let answers = [];
+
+    function startDiagnosis(type) {
+      selectedType = type;
+      document.getElementById("start-area").style.display = "none";
+      document.getElementById("question-area").style.display = "block";
+      showQuestion();
+    }
+
+    function showQuestion() {
+      const questions = selectedType === "dog" ? dogQuestions : catQuestions;
+      document.getElementById("question-text").innerText = `Q${current + 1}. ` + questions[current];
+    }
+
+    function answer(choice) {
+      answers.push(choice);
+      current++;
+      const questions = selectedType === "dog" ? dogQuestions : catQuestions;
+      if (current < questions.length) {
+        showQuestion();
+      } else {
+        runGPT();
+      }
+    }
+
+    async function runGPT() {
+      document.getElementById("question-area").style.display = "none";
+      document.getElementById("loading-area").style.display = "block";
+
+      const res = await fetch("https://us-central1-inuneko-diagnosis-bot-9f4ae.cloudfunctions.net/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: selectedType, answers })
+      });
+
+      const data = await res.json();
+      const resultText = data.result.trim();
+      const slug = slugMap[resultText];
+      if (slug) {
+        window.location.href = `/result/${slug}`;
+      } else {
+        alert("診断結果が取得できませんでした。GPT応答: " + resultText);
+        location.reload();
+      }
+    }
+  </script>
 </body>
 </html>
