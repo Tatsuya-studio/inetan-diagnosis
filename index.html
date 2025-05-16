@@ -1,98 +1,143 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>いぬねこタイプ診断</title>
-  <style>
-    body { font-family: sans-serif; text-align: center; padding: 2em; background: #fffaf3; }
-    .question { font-size: 1.2em; margin: 1em 0; }
-    .button { background: #f4a261; color: white; border: none; padding: 1em 2em; margin: 0.5em; font-size: 1em; border-radius: 10px; cursor: pointer; }
-    .button:hover { background: #e57d23; }
-    #question-area, #loading-area { display: none; }
-  </style>
-</head>
-<body>
-  <div id="start-area">
-    <h1>いぬねこ性格・タイプ診断</h1>
-    <p>どちらの診断を受けますか？</p>
-    <button class="button" onclick="startDiagnosis('dog')">🐶 犬タイプ診断</button>
-    <button class="button" onclick="startDiagnosis('cat')">🐱 猫タイプ診断</button>
-  </div>
+<!-- JavaScript診断ロジックのスケルトン（スコア集計ベース）
+     各質問に回答後、スコアを集計し、最も近い診断タイプのURLへ遷移します -->
 
-  <div id="question-area">
-    <p id="question-text" class="question"></p>
-    <button class="button" onclick="answer('はい')">はい</button>
-    <button class="button" onclick="answer('いいえ')">いいえ</button>
-  </div>
-
-  <div id="loading-area">
-    <p>診断中です... 少々お待ちください。</p>
-  </div>
-
-  <script>
-    const dogQuestions = ["朝型ですか？", "計画的に動くのは得意？", "誰かをリードしたい？", "新しい場所は好き？", "人と話すのは得意？", "1つのことに集中できる？", "責任感が強い？", "協調性がある？", "細かいことが気になる？", "ポジティブですか？"];
-    const catQuestions = ["一人が落ち着く？", "観察力に自信がある？", "気分屋な方？", "表情に出にくい？", "インドアが好き？", "環境変化に敏感？", "自分のペースを守る？", "人見知りする？", "気配りが得意？", "熱中しやすい？"];
-    const slugMap = {
-      "柴犬タイプ": "shiba",
-      "ゴールデンタイプ": "golden",
-      "ラブラドールタイプ": "labrador",
-      "トイプードルタイプ": "toypoodle",
-      "ダックスフンドタイプ": "dachshund",
-      "三毛猫タイプ": "mike",
-      "ロシアンブルータイプ": "russianblue",
-      "ラグドールタイプ": "ragdoll",
-      "ベンガルタイプ": "bengal",
-      "黒猫タイプ": "kuroneko"
-    };
-
-    let selectedType = "dog";
-    let current = 0;
-    let answers = [];
-
-    function startDiagnosis(type) {
-      selectedType = type;
-      document.getElementById("start-area").style.display = "none";
-      document.getElementById("question-area").style.display = "block";
-      showQuestion();
-    }
-
-    function showQuestion() {
-      const questions = selectedType === "dog" ? dogQuestions : catQuestions;
-      document.getElementById("question-text").innerText = `Q${current + 1}. ` + questions[current];
-    }
-
-    function answer(choice) {
-      answers.push(choice);
-      current++;
-      const questions = selectedType === "dog" ? dogQuestions : catQuestions;
-      if (current < questions.length) {
-        showQuestion();
-      } else {
-        runGPT();
-      }
-    }
-
-    async function runGPT() {
-      document.getElementById("question-area").style.display = "none";
-      document.getElementById("loading-area").style.display = "block";
-
-      const res = await fetch("https://us-central1-inuneko-diagnosis-bot-9f4ae.cloudfunctions.net/diagnose", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: selectedType, answers })
-      });
-
-      const data = await res.json();
-      const resultText = data.result.trim();
-      const slug = slugMap[resultText];
-      if (slug) {
-        window.location.href = `/result/${slug}`;
-      } else {
-        alert("診断結果が取得できませんでした。GPT応答: " + resultText);
-        location.reload();
-      }
-    }
-  </script>
-</body>
-</html>
+     <!DOCTYPE html>
+     <html lang="ja">
+     <head>
+       <meta charset="UTF-8" />
+       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+       <title>いぬねこタイプ診断</title>
+     </head>
+     <body>
+       <!-- スタート画面 -->
+       <div id="start">
+         <h1>いぬねこタイプ診断</h1>
+         <p>どちらのタイプ診断を受けますか？</p>
+         <button onclick="start('dog')">🐶 犬タイプ診断</button>
+         <button onclick="start('cat')">🐱 猫タイプ診断</button>
+       </div>
+     
+       <!-- 質問表示エリア -->
+       <div id="question-area" style="display:none;">
+         <p id="question"></p>
+         <button onclick="answer(1)">はい</button>
+         <button onclick="answer(0)">いいえ</button>
+       </div>
+     
+       <script>
+         const dogQuestions = [
+           { q: "誰かのために動くことが好きですか？", key: "loyalty" },
+           { q: "初対面の人とでもすぐ打ち解けますか？", key: "social" },
+           { q: "思いついたらすぐ行動に移すタイプですか？", key: "rhythm" },
+           { q: "周りに合わせるより自分のやり方を優先しますか？", key: "harmony" },
+           { q: "任されたことは必ずやりきりたい方ですか？", key: "responsibility" },
+           { q: "チームワークよりも個人で動く方が得意ですか？", key: "harmony" },
+           { q: "慎重に物事を決める方ですか？", key: "rhythm" },
+           { q: "自由に行動できる環境が好きですか？", key: "loyalty" },
+           { q: "相手の表情や空気に敏感ですか？", key: "social" },
+           { q: "厳しくてもルールは守りたい方ですか？", key: "responsibility" }
+         ];
+     
+         const catQuestions = [
+           { q: "一人の時間を大切にしたい方ですか？", key: "independence" },
+           { q: "環境の変化に敏感な方ですか？", key: "sensitivity" },
+           { q: "相手の表情や雰囲気を読み取るのが得意ですか？", key: "analysis" },
+           { q: "自分だけのルーティンやこだわりがありますか？", key: "preference" },
+           { q: "感情を表に出すことが多い方ですか？", key: "expression" },
+           { q: "小さな音や刺激に気付きやすい方ですか？", key: "sensitivity" },
+           { q: "空気よりも直感で動くタイプですか？", key: "analysis" },
+           { q: "他人の期待よりも自分のペースを優先しますか？", key: "independence" },
+           { q: "自分の考えをすぐ言葉にする方ですか？", key: "expression" },
+           { q: "こだわりには妥協できないタイプですか？", key: "preference" }
+         ];
+     
+         const profiles = {
+           dog: {
+             shiba:     { loyalty: 2, social: 1, rhythm: 1, harmony: 2, responsibility: 2 },
+             golden:    { loyalty: 1, social: 2, rhythm: 2, harmony: 1, responsibility: 1 },
+             labrador:  { loyalty: 2, social: 1, rhythm: 1, harmony: 2, responsibility: 2 },
+             toypoodle: { loyalty: 1, social: 2, rhythm: 2, harmony: 1, responsibility: 1 },
+             dachshund: { loyalty: 1, social: 1, rhythm: 2, harmony: 1, responsibility: 1 }
+           },
+           cat: {
+             mike:       { independence: 1, sensitivity: 2, analysis: 1, preference: 2, expression: 2 },
+             ragdoll:    { independence: 1, sensitivity: 2, analysis: 2, preference: 1, expression: 2 },
+             bengal:     { independence: 2, sensitivity: 1, analysis: 1, preference: 2, expression: 2 },
+             russian:    { independence: 2, sensitivity: 1, analysis: 2, preference: 2, expression: 1 },
+             kuroneko:   { independence: 2, sensitivity: 2, analysis: 2, preference: 2, expression: 1 }
+           }
+         };
+     
+         const resultMap = {
+           dog: {
+             shiba: "https://inunekotype.jp/result-normal-shiba-01/",
+             golden: "https://inunekotype.jp/result-normal-golden-01/",
+             labrador: "https://inunekotype.jp/result-normal-labrador-01/",
+             toypoodle: "https://inunekotype.jp/result-normal-toypoodle-01/",
+             dachshund: "https://inunekotype.jp/result-normal-dachshund-01/"
+           },
+           cat: {
+             mike: "https://inunekotype.jp/result-normal-mike-01/",
+             ragdoll: "https://inunekotype.jp/result-normal-ragdoll-01/",
+             bengal: "https://inunekotype.jp/result-normal-bengal-01/",
+             russian: "https://inunekotype.jp/result-normal-russian-01/",
+             kuroneko: "https://inunekotype.jp/result-normal-kuroneko-01/"
+           }
+         };
+     
+         const scores = {};
+         let index = 0;
+         let currentMode = "";
+         let questions = [];
+     
+         function start(mode) {
+           currentMode = mode;
+           questions = mode === "dog" ? dogQuestions : catQuestions;
+           document.getElementById("start").style.display = "none";
+           document.getElementById("question-area").style.display = "block";
+           showQuestion();
+         }
+     
+         function showQuestion() {
+           document.getElementById("question").innerText = `Q${index + 1}. ` + questions[index].q;
+         }
+     
+         function answer(value) {
+           const key = questions[index].key;
+           scores[key] = (scores[key] || 0) + value;
+           index++;
+           if (index < questions.length) {
+             showQuestion();
+           } else {
+             showResult();
+           }
+         }
+     
+         function showResult() {
+           const resultSlug = calculateResult(currentMode);
+           window.location.href = resultMap[currentMode][resultSlug];
+         }
+     
+         function calculateResult(mode) {
+           const user = scores;
+           let bestMatch = null;
+           let minDistance = Infinity;
+     
+           for (const type in profiles[mode]) {
+             const profile = profiles[mode][type];
+             let distance = 0;
+             for (const key in profile) {
+               const diff = (user[key] || 0) - profile[key];
+               distance += diff * diff;
+             }
+             if (distance < minDistance) {
+               minDistance = distance;
+               bestMatch = type;
+             }
+           }
+           return bestMatch;
+         }
+       </script>
+     </body>
+     </html>
+     
