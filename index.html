@@ -1,143 +1,245 @@
-<!-- JavaScript診断ロジックのスケルトン（スコア集計ベース）
-     各質問に回答後、スコアを集計し、最も近い診断タイプのURLへ遷移します -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>無料いぬねこタイプ診断（Web版）</title>
+  <style>
+    body {
+      font-family: "Noto Sans JP", sans-serif;
+      background: linear-gradient(to bottom, #fffaf3 0%, #fcefe4 100%);
+      padding: 2em;
+      text-align: center;
+      color: #333;
+    }
+    h1 {
+      font-size: 2em;
+      color: #e57d23;
+      margin-bottom: 0.5em;
+    }
+    .question-card {
+      background: #ffffff;
+      padding: 2em;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      display: inline-block;
+      max-width: 500px;
+      margin: 1em auto;
+    }
+    .question-icon {
+      font-size: 2em;
+    }
+    .question-title {
+      font-weight: bold;
+      font-size: 1.1em;
+      margin-bottom: 0.5em;
+    }
+    .question-text {
+      font-size: 1.3em;
+      margin-bottom: 1em;
+    }
+    .status {
+      font-size: 0.9em;
+      color: #999;
+      margin-bottom: 0.5em;
+    }
+    .progress-bar {
+      width: 100%;
+      background-color: #eee;
+      border-radius: 10px;
+      height: 12px;
+      margin-bottom: 1em;
+    }
+    .progress-fill {
+      height: 100%;
+      background-color: #f4a261;
+      width: 0%;
+      border-radius: 10px;
+      transition: width 0.3s ease;
+    }
+    .button {
+      background: #f4a261;
+      color: white;
+      border: none;
+      padding: 1em 2.5em;
+      margin: 1em;
+      font-size: 1.3em;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+    .button:hover {
+      background-color: #e57d23;
+      transform: scale(1.05);
+    }
+    #loading {
+      display: none;
+      font-size: 1.3em;
+      color: #555;
+      margin-top: 3em;
+    }
+    .dots::after {
+      content: "";
+      animation: dots 1.5s steps(3, end) infinite;
+    }
+    @keyframes dots {
+      0% { content: ""; }
+      33% { content: "."; }
+      66% { content: ".."; }
+      100% { content: "..."; }
+    }
+  </style>
+</head>
+<body>
+  <!-- スタート画面 -->
+  <div id="start">
+    <h1>いぬねこタイプ診断</h1>
+    <p>どちらのタイプ診断を受けますか？</p>
+    <button class="button" onclick="start('dog')">🐶 犬タイプ診断</button>
+    <button class="button" onclick="start('cat')">🐱 猫タイプ診断</button>
+  </div>
 
-     <!DOCTYPE html>
-     <html lang="ja">
-     <head>
-       <meta charset="UTF-8" />
-       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-       <title>無料いぬねこタイプ診断（Web版）</title>
-     </head>
-     <body>
-       <!-- スタート画面 -->
-       <div id="start">
-         <h1>いぬねこタイプ診断</h1>
-         <p>どちらのタイプ診断を受けますか？</p>
-         <button onclick="start('dog')">🐶 犬タイプ診断</button>
-         <button onclick="start('cat')">🐱 猫タイプ診断</button>
-       </div>
-     
-       <!-- 質問表示エリア -->
-       <div id="question-area" style="display:none;">
-         <p id="question"></p>
-         <button onclick="answer(1)">はい</button>
-         <button onclick="answer(0)">いいえ</button>
-       </div>
-     
-       <script>
-         const dogQuestions = [
-           { q: "誰かのために動くことが好きですか？", key: "loyalty" },
-           { q: "初対面の人とでもすぐ打ち解けますか？", key: "social" },
-           { q: "思いついたらすぐ行動に移すタイプですか？", key: "rhythm" },
-           { q: "周りに合わせるより自分のやり方を優先しますか？", key: "harmony" },
-           { q: "任されたことは必ずやりきりたい方ですか？", key: "responsibility" },
-           { q: "チームワークよりも個人で動く方が得意ですか？", key: "harmony" },
-           { q: "慎重に物事を決める方ですか？", key: "rhythm" },
-           { q: "自由に行動できる環境が好きですか？", key: "loyalty" },
-           { q: "相手の表情や空気に敏感ですか？", key: "social" },
-           { q: "厳しくてもルールは守りたい方ですか？", key: "responsibility" }
-         ];
-     
-         const catQuestions = [
-           { q: "一人の時間を大切にしたい方ですか？", key: "independence" },
-           { q: "環境の変化に敏感な方ですか？", key: "sensitivity" },
-           { q: "相手の表情や雰囲気を読み取るのが得意ですか？", key: "analysis" },
-           { q: "自分だけのルーティンやこだわりがありますか？", key: "preference" },
-           { q: "感情を表に出すことが多い方ですか？", key: "expression" },
-           { q: "小さな音や刺激に気付きやすい方ですか？", key: "sensitivity" },
-           { q: "空気よりも直感で動くタイプですか？", key: "analysis" },
-           { q: "他人の期待よりも自分のペースを優先しますか？", key: "independence" },
-           { q: "自分の考えをすぐ言葉にする方ですか？", key: "expression" },
-           { q: "こだわりには妥協できないタイプですか？", key: "preference" }
-         ];
-     
-         const profiles = {
-           dog: {
-             shiba:     { loyalty: 2, social: 1, rhythm: 1, harmony: 2, responsibility: 2 },
-             golden:    { loyalty: 1, social: 2, rhythm: 2, harmony: 1, responsibility: 1 },
-             labrador:  { loyalty: 2, social: 1, rhythm: 1, harmony: 2, responsibility: 2 },
-             toypoodle: { loyalty: 1, social: 2, rhythm: 2, harmony: 1, responsibility: 1 },
-             dachshund: { loyalty: 1, social: 1, rhythm: 2, harmony: 1, responsibility: 1 }
-           },
-           cat: {
-             mike:       { independence: 1, sensitivity: 2, analysis: 1, preference: 2, expression: 2 },
-             ragdoll:    { independence: 1, sensitivity: 2, analysis: 2, preference: 1, expression: 2 },
-             bengal:     { independence: 2, sensitivity: 1, analysis: 1, preference: 2, expression: 2 },
-             russian:    { independence: 2, sensitivity: 1, analysis: 2, preference: 2, expression: 1 },
-             kuroneko:   { independence: 2, sensitivity: 2, analysis: 2, preference: 2, expression: 1 }
-           }
-         };
-     
-         const resultMap = {
-           dog: {
-             shiba: "https://inunekotype.jp/result-normal-shiba-01/",
-             golden: "https://inunekotype.jp/result-normal-golden-01/",
-             labrador: "https://inunekotype.jp/result-normal-labrador-01/",
-             toypoodle: "https://inunekotype.jp/result-normal-toypoodle-01/",
-             dachshund: "https://inunekotype.jp/result-normal-dachshund-01/"
-           },
-           cat: {
-             mike: "https://inunekotype.jp/result-normal-mike-01/",
-             ragdoll: "https://inunekotype.jp/result-normal-ragdoll-01/",
-             bengal: "https://inunekotype.jp/result-normal-bengal-01/",
-             russian: "https://inunekotype.jp/result-normal-russian-01/",
-             kuroneko: "https://inunekotype.jp/result-normal-kuroneko-01/"
-           }
-         };
-     
-         const scores = {};
-         let index = 0;
-         let currentMode = "";
-         let questions = [];
-     
-         function start(mode) {
-           currentMode = mode;
-           questions = mode === "dog" ? dogQuestions : catQuestions;
-           document.getElementById("start").style.display = "none";
-           document.getElementById("question-area").style.display = "block";
-           showQuestion();
-         }
-     
-         function showQuestion() {
-           document.getElementById("question").innerText = `Q${index + 1}. ` + questions[index].q;
-         }
-     
-         function answer(value) {
-           const key = questions[index].key;
-           scores[key] = (scores[key] || 0) + value;
-           index++;
-           if (index < questions.length) {
-             showQuestion();
-           } else {
-             showResult();
-           }
-         }
-     
-         function showResult() {
-           const resultSlug = calculateResult(currentMode);
-           window.location.href = resultMap[currentMode][resultSlug];
-         }
-     
-         function calculateResult(mode) {
-           const user = scores;
-           let bestMatch = null;
-           let minDistance = Infinity;
-     
-           for (const type in profiles[mode]) {
-             const profile = profiles[mode][type];
-             let distance = 0;
-             for (const key in profile) {
-               const diff = (user[key] || 0) - profile[key];
-               distance += diff * diff;
-             }
-             if (distance < minDistance) {
-               minDistance = distance;
-               bestMatch = type;
-             }
-           }
-           return bestMatch;
-         }
-       </script>
-     </body>
-     </html>
-     
+  <!-- 質問表示エリア -->
+  <div id="question-area" style="display:none;">
+    <div class="question-card">
+      <div class="status" id="status-text"></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="question-icon" id="question-icon">🐾</div>
+      <div class="question-title">質問</div>
+      <div class="question-text" id="question-text"></div>
+      <button class="button" onclick="answer(1)">はい</button>
+      <button class="button" onclick="answer(0)">いいえ</button>
+    </div>
+  </div>
+
+  <!-- 診断中ローディング -->
+  <div id="loading">
+    <p>診断中です<span class="dots"></span></p>
+  </div>
+
+  <script>
+    const dogQuestions = [
+      { q: "誰かのために動くことが好きですか？", key: "loyalty" },
+      { q: "初対面の人とでもすぐ打ち解けますか？", key: "social" },
+      { q: "思いついたらすぐ行動に移すタイプですか？", key: "rhythm" },
+      { q: "周りに合わせるより自分のやり方を優先しますか？", key: "harmony" },
+      { q: "任されたことは必ずやりきりたい方ですか？", key: "responsibility" },
+      { q: "チームワークよりも個人で動く方が得意ですか？", key: "harmony" },
+      { q: "慎重に物事を決める方ですか？", key: "rhythm" },
+      { q: "自由に行動できる環境が好きですか？", key: "loyalty" },
+      { q: "相手の表情や空気に敏感ですか？", key: "social" },
+      { q: "厳しくてもルールは守りたい方ですか？", key: "responsibility" }
+    ];
+
+    const catQuestions = [
+      { q: "一人の時間を大切にしたい方ですか？", key: "independence" },
+      { q: "環境の変化に敏感な方ですか？", key: "sensitivity" },
+      { q: "相手の表情や雰囲気を読み取るのが得意ですか？", key: "analysis" },
+      { q: "自分だけのルーティンやこだわりがありますか？", key: "preference" },
+      { q: "感情を表に出すことが多い方ですか？", key: "expression" },
+      { q: "小さな音や刺激に気付きやすい方ですか？", key: "sensitivity" },
+      { q: "空気よりも直感で動くタイプですか？", key: "analysis" },
+      { q: "他人の期待よりも自分のペースを優先しますか？", key: "independence" },
+      { q: "自分の考えをすぐ言葉にする方ですか？", key: "expression" },
+      { q: "こだわりには妥協できないタイプですか？", key: "preference" }
+    ];
+
+    const profiles = {
+      dog: {
+        shiba:     { loyalty: 2, social: 1, rhythm: 1, harmony: 2, responsibility: 2 },
+        golden:    { loyalty: 1, social: 2, rhythm: 2, harmony: 1, responsibility: 1 },
+        labrador:  { loyalty: 2, social: 1, rhythm: 1, harmony: 2, responsibility: 2 },
+        toypoodle: { loyalty: 1, social: 2, rhythm: 2, harmony: 1, responsibility: 1 },
+        dachshund: { loyalty: 1, social: 1, rhythm: 2, harmony: 1, responsibility: 1 }
+      },
+      cat: {
+        mike:       { independence: 1, sensitivity: 2, analysis: 1, preference: 2, expression: 2 },
+        ragdoll:    { independence: 1, sensitivity: 2, analysis: 2, preference: 1, expression: 2 },
+        bengal:     { independence: 2, sensitivity: 1, analysis: 1, preference: 2, expression: 2 },
+        russian:    { independence: 2, sensitivity: 1, analysis: 2, preference: 2, expression: 1 },
+        kuroneko:   { independence: 2, sensitivity: 2, analysis: 2, preference: 2, expression: 1 }
+      }
+    };
+
+    const resultMap = {
+      dog: {
+        shiba: "https://inunekotype.jp/result-normal-shiba-01/",
+        golden: "https://inunekotype.jp/result-normal-golden-01/",
+        labrador: "https://inunekotype.jp/result-normal-labrador-01/",
+        toypoodle: "https://inunekotype.jp/result-normal-toypoodle-01/",
+        dachshund: "https://inunekotype.jp/result-normal-dachshund-01/"
+      },
+      cat: {
+        mike: "https://inunekotype.jp/result-normal-mike-01/",
+        ragdoll: "https://inunekotype.jp/result-normal-ragdoll-01/",
+        bengal: "https://inunekotype.jp/result-normal-bengal-01/",
+        russian: "https://inunekotype.jp/result-normal-russian-01/",
+        kuroneko: "https://inunekotype.jp/result-normal-kuroneko-01/"
+      }
+    };
+
+    const scores = {};
+    let index = 0;
+    let currentMode = "";
+    let questions = [];
+
+    function start(mode) {
+      currentMode = mode;
+      index = 0;
+      questions = mode === "dog" ? dogQuestions : catQuestions;
+      Object.keys(scores).forEach(k => delete scores[k]);
+      document.getElementById("start").style.display = "none";
+      document.getElementById("question-area").style.display = "block";
+      showQuestion();
+    }
+
+    function showQuestion() {
+      const emoji = currentMode === "dog" ? "🐶" : "🐱";
+      document.getElementById("status-text").innerText = `Q${index + 1} / 10`;
+      document.getElementById("question-icon").innerText = emoji;
+      document.getElementById("question-text").innerText = questions[index].q;
+      document.getElementById("progress-fill").style.width = `${(index / 10) * 100}%`;
+    }
+
+    function answer(value) {
+      const key = questions[index].key;
+      scores[key] = (scores[key] || 0) + value;
+      index++;
+      if (index < questions.length) {
+        showQuestion();
+      } else {
+        showResult();
+      }
+    }
+
+    function showResult() {
+      document.getElementById("question-area").style.display = "none";
+      document.getElementById("loading").style.display = "block";
+      setTimeout(() => {
+        const resultSlug = calculateResult(currentMode);
+        window.location.href = resultMap[currentMode][resultSlug];
+      }, 1600);
+    }
+
+    function calculateResult(mode) {
+      const user = scores;
+      let bestMatch = null;
+      let minDistance = Infinity;
+      for (const type in profiles[mode]) {
+        const profile = profiles[mode][type];
+        let distance = 0;
+        for (const key in profile) {
+          const diff = (user[key] || 0) - profile[key];
+          distance += diff * diff;
+        }
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestMatch = type;
+        }
+      }
+      return bestMatch;
+    }
+  </script>
+</body>
+</html>
